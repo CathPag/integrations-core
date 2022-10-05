@@ -24,7 +24,7 @@ except ImportError:
 
 logger = logging.getLogger(__file__)
 
-DATABASE_EXISTS_QUERY = 'select name, collation_name from sys.databases;'
+DATABASE_EXISTS_QUERY = "select name, collation_name from sys.databases;"
 DEFAULT_CONN_PORT = 1433
 
 
@@ -40,7 +40,7 @@ def split_sqlserver_host_port(host):
     """
     if not host:
         return host, None
-    host_split = [s.strip() for s in host.split(',')]
+    host_split = [s.strip() for s in host.split(",")]
     if len(host_split) == 1:
         return host_split[0], None
     if len(host_split) == 2:
@@ -58,7 +58,7 @@ def split_sqlserver_host_port(host):
 
 # we're only including the bare minimum set of special characters required to parse the connection string while
 # supporting escaping using braces, letting the client library or the database ultimately decide what's valid
-CONNECTION_STRING_SPECIAL_CHARACTERS = set('=;{}')
+CONNECTION_STRING_SPECIAL_CHARACTERS = set("=;{}")
 
 
 def parse_connection_string_properties(cs):
@@ -75,57 +75,71 @@ def parse_connection_string_properties(cs):
     key, parsed, key_done = "", "", False
     while i < len(cs):
         if escaping:
-            if cs[i : i + 2] == '}}':
-                parsed += '}'
+            if cs[i : i + 2] == "}}":
+                parsed += "}"
                 i += 2
                 continue
-            if cs[i] == '}':
+            if cs[i] == "}":
                 escaping = False
                 i += 1
                 continue
             parsed += cs[i]
             i += 1
             continue
-        if cs[i] == '{':
+        if cs[i] == "{":
             escaping = True
             i += 1
             continue
         # ignore leading whitespace, i.e. between two keys "A=B;  C=D"
-        if not key_done and not parsed and cs[i] == ' ':
+        if not key_done and not parsed and cs[i] == " ":
             i += 1
             continue
-        if cs[i] == '=':
+        if cs[i] == "=":
             if key_done:
                 raise ConfigurationError(
-                    "Invalid connection string: unexpected '=' while parsing value at index={}: {}".format(i, cs)
+                    "Invalid connection string: unexpected '=' while parsing value at index={}: {}".format(
+                        i, cs
+                    )
                 )
             key, parsed, key_done = parsed, "", True
             if not key:
-                raise ConfigurationError("Invalid connection string: empty key at index={}: {}".format(i, cs))
+                raise ConfigurationError(
+                    "Invalid connection string: empty key at index={}: {}".format(i, cs)
+                )
             i += 1
             continue
-        if cs[i] == ';':
+        if cs[i] == ";":
             if not parsed:
-                raise ConfigurationError("Invalid connection string: empty value at index={}: {}".format(i, cs))
+                raise ConfigurationError(
+                    "Invalid connection string: empty value at index={}: {}".format(
+                        i, cs
+                    )
+                )
             params[key] = parsed
             key, parsed, key_done = "", "", False
             i += 1
             continue
         if cs[i] in CONNECTION_STRING_SPECIAL_CHARACTERS:
             raise ConfigurationError(
-                "Invalid connection string: invalid character '{}' at index={}: {}".format(cs[i], i, cs)
+                "Invalid connection string: invalid character '{}' at index={}: {}".format(
+                    cs[i], i, cs
+                )
             )
         parsed += cs[i]
         i += 1
     # the last ';' can be omitted so check for a final remaining param here
     if escaping:
         raise ConfigurationError(
-            "Invalid connection string: did not find expected matching closing brace '}}': {}".format(cs)
+            "Invalid connection string: did not find expected matching closing brace '}}': {}".format(
+                cs
+            )
         )
     if key:
         if not parsed:
             raise ConfigurationError(
-                "Invalid connection string: empty value at the end of the connection string: {}".format(cs)
+                "Invalid connection string: empty value at the end of the connection string: {}".format(
+                    cs
+                )
             )
         params[key] = parsed
     return params
@@ -148,7 +162,11 @@ def _format_connection_exception(e):
     then the message is replaced with more descriptive messages based on the contained HResult error codes.
     """
     if adodbapi is not None:
-        if isinstance(e, OperationalError) and e.args and isinstance(e.args[0], com_error):
+        if (
+            isinstance(e, OperationalError)
+            and e.args
+            and isinstance(e.args[0], com_error)
+        ):
             e_comm = e.args[0]
             hresult = e_comm.hresult
             sub_hresult = None
@@ -158,7 +176,7 @@ def _format_connection_exception(e):
                 if len(internal_args) == 6:
                     internal_message = internal_args[2]
                     sub_hresult = internal_args[5]
-            if internal_message == 'Invalid connection string attribute':
+            if internal_message == "Invalid connection string attribute":
                 base_message = known_hresult_codes.get(hresult)
                 sub_message = known_hresult_codes.get(sub_hresult)
                 if base_message and sub_message:
@@ -170,15 +188,15 @@ class Connection(object):
     """Manages the connection to a SQL Server instance."""
 
     DEFAULT_COMMAND_TIMEOUT = 5
-    DEFAULT_DATABASE = 'master'
-    DEFAULT_DRIVER = 'SQL Server'
-    DEFAULT_DB_KEY = 'database'
+    DEFAULT_DATABASE = "master"
+    DEFAULT_DRIVER = "SQL Server"
+    DEFAULT_DB_KEY = "database"
     DEFAULT_SQLSERVER_VERSION = 1e9
     SQLSERVER_2014 = 2014
-    PROC_GUARD_DB_KEY = 'proc_only_if_database'
+    PROC_GUARD_DB_KEY = "proc_only_if_database"
 
-    valid_adoproviders = ['SQLOLEDB', 'MSOLEDBSQL', 'MSOLEDBSQL19', 'SQLNCLI11']
-    default_adoprovider = 'SQLOLEDB'
+    valid_adoproviders = ["SQLOLEDB", "MSOLEDBSQL", "MSOLEDBSQL19", "SQLNCLI11"]
+    default_adoprovider = "SQLOLEDB"
 
     def __init__(self, init_config, instance_config, service_check_handler):
         self.instance = instance_config
@@ -187,31 +205,39 @@ class Connection(object):
 
         # mapping of raw connections based on conn_key to different databases
         self._conns = {}
-        self.timeout = int(self.instance.get('command_timeout', self.DEFAULT_COMMAND_TIMEOUT))
+        self.timeout = int(
+            self.instance.get("command_timeout", self.DEFAULT_COMMAND_TIMEOUT)
+        )
         self.existing_databases = None
-        self.server_version = int(self.instance.get('server_version', self.DEFAULT_SQLSERVER_VERSION))
+        self.server_version = int(
+            self.instance.get("server_version", self.DEFAULT_SQLSERVER_VERSION)
+        )
 
         self.adoprovider = self.default_adoprovider
 
         self.valid_connectors = []
         if adodbapi is not None:
-            self.valid_connectors.append('adodbapi')
+            self.valid_connectors.append("adodbapi")
         if pyodbc is not None:
-            self.valid_connectors.append('odbc')
+            self.valid_connectors.append("odbc")
 
-        connector = init_config.get('connector')
+        connector = init_config.get("connector")
         if connector is None or connector.lower() not in self.valid_connectors:
             if connector is None:
-                self.log.debug("`connector` config value was not set, defaulting to adodbapi")
+                self.log.debug(
+                    "`connector` config value was not set, defaulting to adodbapi"
+                )
             else:
-                self.log.error("Invalid database connector %s, defaulting to adodbapi", connector)
-            self.default_connector = 'adodbapi'
+                self.log.error(
+                    "Invalid database connector %s, defaulting to adodbapi", connector
+                )
+            self.default_connector = "adodbapi"
         else:
             self.default_connector = connector
 
         self.connector = self.get_connector()
 
-        self.adoprovider = init_config.get('adoprovider', self.default_adoprovider)
+        self.adoprovider = init_config.get("adoprovider", self.default_adoprovider)
         if self.adoprovider.upper() not in self.valid_adoproviders:
             self.log.error(
                 "Invalid ADODB provider string %s, defaulting to %s",
@@ -220,7 +246,7 @@ class Connection(object):
             )
             self.adoprovider = self.default_adoprovider
 
-        self.log.debug('Connection initialized.')
+        self.log.debug("Connection initialized.")
 
     @contextmanager
     def get_managed_cursor(self, key_prefix=None):
@@ -242,7 +268,11 @@ class Connection(object):
             # We catch KeyError to avoid leaking the auth info used to compose the key
             # FIXME: we should find a better way to compute unique keys to map opened connections other than
             # using auth info in clear text!
-            raise SQLConnectionError("Cannot find an opened connection for host: {}".format(self.instance.get('host')))
+            raise SQLConnectionError(
+                "Cannot find an opened connection for host: {}".format(
+                    self.instance.get("host")
+                )
+            )
         return conn.cursor()
 
     def close_cursor(self, cursor):
@@ -273,7 +303,9 @@ class Connection(object):
 
     @contextmanager
     def open_managed_default_connection(self, key_prefix=None):
-        with self._open_managed_db_connections(self.DEFAULT_DB_KEY, key_prefix=key_prefix):
+        with self._open_managed_db_connections(
+            self.DEFAULT_DB_KEY, key_prefix=key_prefix
+        ):
             yield
 
     @contextmanager
@@ -284,7 +316,9 @@ class Connection(object):
         finally:
             self.close_db_connections(db_key, db_name, key_prefix=key_prefix)
 
-    def open_db_connections(self, db_key, db_name=None, is_default=True, key_prefix=None):
+    def open_db_connections(
+        self, db_key, db_name=None, is_default=True, key_prefix=None
+    ):
         """
         We open the db connections explicitly, so we can ensure they are open
         before we use them, and are closable, once we are finished. Open db
@@ -295,22 +329,26 @@ class Connection(object):
 
         _, host, _, _, database, _ = self._get_access_info(db_key, db_name)
 
-        cs = self.instance.get('connection_string', '')
-        cs += ';' if cs != '' else ''
+        cs = self.instance.get("connection_string", "")
+        cs += ";" if cs != "" else ""
 
         self._connection_options_validation(db_key, db_name)
 
         try:
-            if self.connector == 'adodbapi':
+            if self.connector == "adodbapi":
                 cs += self._conn_string_adodbapi(db_key, db_name=db_name)
                 # autocommit: true disables implicit transaction
-                rawconn = adodbapi.connect(cs, {'timeout': self.timeout, 'autocommit': True})
+                rawconn = adodbapi.connect(
+                    cs, {"timeout": self.timeout, "autocommit": True}
+                )
             else:
                 cs += self._conn_string_odbc(db_key, db_name=db_name)
                 rawconn = pyodbc.connect(cs, timeout=self.timeout, autocommit=True)
                 rawconn.timeout = self.timeout
 
-            self.service_check_handler(AgentCheck.OK, host, database, is_default=is_default)
+            self.service_check_handler(
+                AgentCheck.OK, host, database, is_default=is_default
+            )
             if conn_key not in self._conns:
                 self._conns[conn_key] = rawconn
             else:
@@ -329,11 +367,13 @@ class Connection(object):
                 host, database, tcp_connection_status, _format_connection_exception(e)
             )
 
-            password = self.instance.get('password')
+            password = self.instance.get("password")
             if password is not None:
                 message = message.replace(password, "*" * 6)
 
-            self.service_check_handler(AgentCheck.CRITICAL, host, database, message, is_default=is_default)
+            self.service_check_handler(
+                AgentCheck.CRITICAL, host, database, message, is_default=is_default
+            )
 
             # Only raise exception on the default instance database
             if is_default:
@@ -381,7 +421,9 @@ class Connection(object):
                 cursor.execute(DATABASE_EXISTS_QUERY)
                 for row in cursor:
                     # collation_name can be NULL if db offline, in that case assume its case_insensitive
-                    case_insensitive = not row.collation_name or 'CI' in row.collation_name
+                    case_insensitive = (
+                        not row.collation_name or "CI" in row.collation_name
+                    )
                     self.existing_databases[row.name.lower()] = (
                         case_insensitive,
                         row.name,
@@ -402,7 +444,7 @@ class Connection(object):
         return exists, context
 
     def get_connector(self):
-        connector = self.instance.get('connector', self.default_connector)
+        connector = self.instance.get("connector", self.default_connector)
         if connector != self.default_connector:
             if connector.lower() not in self.valid_connectors:
                 self.log.warning(
@@ -414,13 +456,13 @@ class Connection(object):
             else:
                 self.log.debug(
                     "Overriding default connector for %s with %s",
-                    self.instance['host'],
+                    self.instance["host"],
                     connector,
                 )
         return connector
 
     def _get_adoprovider(self):
-        provider = self.instance.get('adoprovider', self.default_adoprovider)
+        provider = self.instance.get("adoprovider", self.default_adoprovider)
         if provider != self.adoprovider:
             if provider.upper() not in self.valid_adoproviders:
                 self.log.warning(
@@ -432,23 +474,25 @@ class Connection(object):
             else:
                 self.log.debug(
                     "Overriding default ADO provider for %s with %s",
-                    self.instance['host'],
+                    self.instance["host"],
                     provider,
                 )
         return provider
 
     def _get_access_info(self, db_key, db_name=None):
         """Convenience method to extract info from instance"""
-        dsn = self.instance.get('dsn')
-        username = self.instance.get('username')
-        password = self.instance.get('password')
+        dsn = self.instance.get("dsn")
+        username = self.instance.get("username")
+        password = self.instance.get("password")
         database = self.instance.get(db_key) if db_name is None else db_name
-        driver = self.instance.get('driver')
+        driver = self.instance.get("driver")
         host = self._get_host_with_port()
 
         if not dsn:
             if not host:
-                self.log.debug("No host provided, falling back to defaults: host=127.0.0.1, port=1433")
+                self.log.debug(
+                    "No host provided, falling back to defaults: host=127.0.0.1, port=1433"
+                )
                 host = "127.0.0.1,1433"
             if not database:
                 self.log.debug(
@@ -474,7 +518,7 @@ class Connection(object):
         if not host:
             return None
 
-        port = str(DEFAULT_CONN_PORT)
+        port = DEFAULT_CONN_PORT
         split_host, split_port = split_sqlserver_host_port(host)
         config_port = self.instance.get("port")
 
@@ -486,52 +530,57 @@ class Connection(object):
             int(port)
         except ValueError:
             self.log.warning("Invalid port %s; falling back to default 1433", port)
-            port = str(DEFAULT_CONN_PORT)
+            port = DEFAULT_CONN_PORT
 
-        return split_host + "," + port
+        return split_host + "," + str(port)
 
     def _conn_key(self, db_key, db_name=None, key_prefix=None):
         """Return a key to use for the connection cache"""
-        dsn, host, username, password, database, driver = self._get_access_info(db_key, db_name)
+        dsn, host, username, password, database, driver = self._get_access_info(
+            db_key, db_name
+        )
         if not key_prefix:
             key_prefix = ""
-        return '{}{}:{}:{}:{}:{}:{}'.format(key_prefix, dsn, host, username, password, database, driver)
+        return "{}{}:{}:{}:{}:{}:{}".format(
+            key_prefix, dsn, host, username, password, database, driver
+        )
 
     def _connection_options_validation(self, db_key, db_name):
-        cs = self.instance.get('connection_string')
-        username = self.instance.get('username')
-        password = self.instance.get('password')
+        cs = self.instance.get("connection_string")
+        username = self.instance.get("username")
+        password = self.instance.get("password")
 
         adodbapi_options = {
-            'PROVIDER': 'adoprovider',
-            'Data Source': 'host',
-            'Initial Catalog': db_name or db_key,
-            'User ID': 'username',
-            'Password': 'password',
+            "PROVIDER": "adoprovider",
+            "Data Source": "host",
+            "Initial Catalog": db_name or db_key,
+            "User ID": "username",
+            "Password": "password",
         }
         odbc_options = {
-            'DSN': 'dsn',
-            'DRIVER': 'driver',
-            'SERVER': 'host',
-            'DATABASE': db_name or db_key,
-            'UID': 'username',
-            'PWD': 'password',
+            "DSN": "dsn",
+            "DRIVER": "driver",
+            "SERVER": "host",
+            "DATABASE": db_name or db_key,
+            "UID": "username",
+            "PWD": "password",
         }
 
-        if self.connector == 'adodbapi':
-            other_connector = 'odbc'
+        if self.connector == "adodbapi":
+            other_connector = "odbc"
             connector_options = adodbapi_options
             other_connector_options = odbc_options
 
         else:
-            other_connector = 'adodbapi'
+            other_connector = "adodbapi"
             connector_options = odbc_options
             other_connector_options = adodbapi_options
 
         for option in {
             value
             for key, value in other_connector_options.items()
-            if value not in connector_options.values() and self.instance.get(value) is not None
+            if value not in connector_options.values()
+            and self.instance.get(value) is not None
         }:
             self.log.warning(
                 "%s option will be ignored since %s connection is used",
@@ -545,24 +594,31 @@ class Connection(object):
         parsed_cs = parse_connection_string_properties(cs)
         lowercased_keys_cs = {k.lower(): v for k, v in parsed_cs.items()}
 
-        if lowercased_keys_cs.get('trusted_connection', "false").lower() in {
-            'yes',
-            'true',
+        if lowercased_keys_cs.get("trusted_connection", "false").lower() in {
+            "yes",
+            "true",
         } and (username or password):
-            self.log.warning("Username and password are ignored when using Windows authentication")
+            self.log.warning(
+                "Username and password are ignored when using Windows authentication"
+            )
 
         for key, value in connector_options.items():
-            if key.lower() in lowercased_keys_cs and self.instance.get(value) is not None:
+            if (
+                key.lower() in lowercased_keys_cs
+                and self.instance.get(value) is not None
+            ):
                 raise ConfigurationError(
                     "%s has been provided both in the connection string and as a "
-                    "configuration option (%s), please specify it only once" % (key, value)
+                    "configuration option (%s), please specify it only once"
+                    % (key, value)
                 )
         for key in other_connector_options.keys():
             if key.lower() in lowercased_keys_cs:
                 raise ConfigurationError(
                     "%s has been provided in the connection string. "
                     "This option is only available for %s connections,"
-                    " however %s has been selected" % (key, other_connector, self.connector)
+                    " however %s has been selected"
+                    % (key, other_connector, self.connector)
                 )
 
     def _conn_string_odbc(self, db_key, conn_key=None, db_name=None):
@@ -570,27 +626,29 @@ class Connection(object):
         if conn_key:
             dsn, host, username, password, database, driver = conn_key.split(":")
         else:
-            dsn, host, username, password, database, driver = self._get_access_info(db_key, db_name)
+            dsn, host, username, password, database, driver = self._get_access_info(
+                db_key, db_name
+            )
 
         # The connection resiliency feature is supported on Microsoft Azure SQL Database
         # and SQL Server 2014 (and later) server versions. See the SQLServer docs for more information
         # https://docs.microsoft.com/en-us/sql/connect/odbc/connection-resiliency?view=sql-server-ver15
-        conn_str = ''
+        conn_str = ""
         if self.server_version >= self.SQLSERVER_2014:
-            conn_str += 'ConnectRetryCount=2;'
+            conn_str += "ConnectRetryCount=2;"
         if dsn:
-            conn_str += 'DSN={};'.format(dsn)
+            conn_str += "DSN={};".format(dsn)
         if driver:
-            conn_str += 'DRIVER={};'.format(driver)
+            conn_str += "DRIVER={};".format(driver)
         if host:
-            conn_str += 'Server={};'.format(host)
+            conn_str += "Server={};".format(host)
         if database:
-            conn_str += 'Database={};'.format(database)
+            conn_str += "Database={};".format(database)
         if username:
-            conn_str += 'UID={};'.format(username)
+            conn_str += "UID={};".format(username)
         self.log.debug("Connection string (before password) %s", conn_str)
         if password:
-            conn_str += 'PWD={};'.format(password)
+            conn_str += "PWD={};".format(password)
         return conn_str
 
     def _conn_string_adodbapi(self, db_key, conn_key=None, db_name=None):
@@ -598,21 +656,25 @@ class Connection(object):
         if conn_key:
             _, host, username, password, database, _ = conn_key.split(":")
         else:
-            _, host, username, password, database, _ = self._get_access_info(db_key, db_name)
+            _, host, username, password, database, _ = self._get_access_info(
+                db_key, db_name
+            )
 
         provider = self._get_adoprovider()
-        retry_conn_count = ''
+        retry_conn_count = ""
         if self.server_version >= self.SQLSERVER_2014:
-            retry_conn_count = 'ConnectRetryCount=2;'
-        conn_str = '{}Provider={};Data Source={};Initial Catalog={};'.format(retry_conn_count, provider, host, database)
+            retry_conn_count = "ConnectRetryCount=2;"
+        conn_str = "{}Provider={};Data Source={};Initial Catalog={};".format(
+            retry_conn_count, provider, host, database
+        )
 
         if username:
-            conn_str += 'User ID={};'.format(username)
+            conn_str += "User ID={};".format(username)
         self.log.debug("Connection string (before password) %s", conn_str)
         if password:
-            conn_str += 'Password={};'.format(password)
+            conn_str += "Password={};".format(password)
         if not username and not password:
-            conn_str += 'Integrated Security=SSPI;'
+            conn_str += "Integrated Security=SSPI;"
         return conn_str
 
     def test_network_connectivity(self):
@@ -622,7 +684,7 @@ class Connection(object):
 
         :return: error_message if failed connection else None
         """
-        host, port = split_sqlserver_host_port(self.instance.get('host'))
+        host, port = split_sqlserver_host_port(self.instance.get("host"))
         if port is None:
             port = DEFAULT_CONN_PORT
             provided_port = self.instance.get("port")
@@ -639,6 +701,8 @@ class Connection(object):
             try:
                 sock.connect((host, port))
             except Exception as e:
-                return "ERROR: {}".format(e.strerror if hasattr(e, 'strerror') else repr(e))
+                return "ERROR: {}".format(
+                    e.strerror if hasattr(e, "strerror") else repr(e)
+                )
 
         return None
